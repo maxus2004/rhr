@@ -26,6 +26,7 @@ def fixAngleOverflow(a):
         a += 360
 
 def turnTo():
+    global targetYaw
     prevMoveTime = time.time()
     prevMoveDirection = "forwards"
     while True:
@@ -57,6 +58,7 @@ def turnTo():
         time.sleep(0.02)
 
 def turnRight():
+    global targetYaw
     # drive forward a bit
     startTime = time.time()
     while(time.time()-startTime < 1):
@@ -68,6 +70,7 @@ def turnRight():
     turnTo(targetYaw)
 
 def turnLeft():
+    global targetYaw
     # drive forward a bit
     startTime = time.time()
     while(time.time()-startTime < 1):
