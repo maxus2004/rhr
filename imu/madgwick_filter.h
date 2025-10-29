@@ -2,7 +2,7 @@
 
 #define PI 3.14159265358979f
 
-#define BETA 0
+#define BETA 0.01
 
 #include <math.h>
 #include <stdio.h>

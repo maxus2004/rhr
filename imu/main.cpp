@@ -91,7 +91,7 @@ void IMU_calibrate(int fd){
     float prev_print_time = 0;
     float time = 0;
     auto start = std::chrono::system_clock::now();
-    for(int i = 0;i<1000;i++){
+    for(int i = 0;i<500;i++){
         float ax, ay, az, gx, gy, gz;
         IMU_wait_and_get_data(fd, &ax, &ay, &az, &gx, &gy, &gz);
         gx_sum += gx;
