@@ -1,0 +1,113 @@
+# ничего на роботах нормально не работает
+# по этому едем по правилу правой руки
+# как школьники которые в первый раз Arduino увидели
+
+import time
+import motors
+import imu
+import threading
+
+targetYaw = 0
+
+
+def getDistances():
+    return 0,0,0
+
+def continueDriving():
+    motors.motorCommand(100,100)
+
+def stop():
+    motors.motorCommand(0,0)
+
+def fixAngleOverflow(a):
+    while a > 180:
+        a -= 360
+    while a < -180:
+        a += 360
+
+def turnTo():
+    prevMoveTime = time.time()
+    prevMoveDirection = "forwards"
+    while True:
+        yaw = imu.getYaw()
+        error = fixAngleOverflow(targetYaw-yaw)
+
+        # move forward/backward a bit if stuck
+        if(time.time()-prevMoveTime > 5):
+            prevMoveTime = time.time()
+            if prevMoveDirection == "forwards":
+                motors.motorCommand(-100, -100)
+                prevMoveDirection = "backwards"
+            else:
+                motors.motorCommand(100, 100)
+                prevMoveDirection = "forwards"
+            time.sleep(0.1)
+
+        # turn
+        if(error > 20):
+            motors.motorCommand(500, -500)
+        elif(error < -20):
+            motors.motorCommand(-500, 500)
+        if(error > 5):
+            motors.motorCommand(100, -100)
+        elif(error < -5):
+            motors.motorCommand(-100, 100)
+        else:
+            break
+        time.sleep(0.02)
+
+def turnRight():
+    # drive forward a bit
+    startTime = time.time()
+    while(time.time()-startTime < 1):
+        continueDriving()
+        time.sleep(0.02)
+
+    # turn
+    targetYaw = fixAngleOverflow(targetYaw+90)
+    turnTo(targetYaw)
+
+def turnLeft():
+    # drive forward a bit
+    startTime = time.time()
+    while(time.time()-startTime < 1):
+        continueDriving()
+        time.sleep(0.02)
+
+    # turn
+    targetYaw = fixAngleOverflow(targetYaw-90)
+    turnTo(targetYaw)
+
+
+state = "stop"
+
+def drive_loop():
+    while True:
+        leftDistance, frontDistance, rightDistance = getDistances()
+
+        if state == "go":
+            continueDriving()
+        elif state == "right":
+            turnRight()
+            state = "go"
+        elif state == "left":
+            turnLeft()
+            state = "go"
+        else:
+            stop()
+
+        time.sleep(0.02)
+
+threading.Thread(target=drive_loop).start()
+
+while True:
+    c = input()
+    match c:
+        case "w":
+            state = "go"
+        case "a":
+            state = "left"
+        case "d":
+            state = "right"
+        case _:
+            state = "stop"
