@@ -82,6 +82,7 @@ def turnLeft():
 state = "stop"
 
 def drive_loop():
+    global state
     while True:
         leftDistance, frontDistance, rightDistance = getDistances()
 
