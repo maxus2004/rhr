@@ -68,7 +68,7 @@ while True:
     if rightDistance > 0.5:
         # drive forward a bit
         startTime = time.time()
-        while(time.time()-startTime < 0.5):
+        while(time.time()-startTime < 3):
             continueDriving()
             time.sleep(0.02)
         turnRight()
