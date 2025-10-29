@@ -49,7 +49,7 @@ def turnTo(targetYaw):
             motors.motorCommand(500, -500)
         elif(error < -20):
             motors.motorCommand(-500, 500)
-        if(error > 5):
+        elif(error > 5):
             motors.motorCommand(100, -100)
         elif(error < -5):
             motors.motorCommand(-100, 100)
