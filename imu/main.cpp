@@ -20,9 +20,9 @@
 #define OUTX_L_A        0x28
 #define STATUS_REG      0x1E
 
-double gyro_scale = 0.00122173; // rad/s/LSB
+float gyro_scale = 0.00122173; // rad/s/LSB
 float accel_scale = 0.000244;  // g/LSB
-double dt = 1/1666.0;
+float dt = 1/1666.0;
 
 float gx_offset = 0, gy_offset = 0, gz_offset = 0;
 
@@ -70,7 +70,7 @@ bool IMU_data_available(int fd){
     return reg_value & 0b00000010 != 0;
 }
 
-void IMU_wait_and_get_data(int fd, double *ax, double *ay, double *az, double *gx, double *gy, double *gz){
+void IMU_wait_and_get_data(int fd, float *ax, float *ay, float *az, float *gx, float *gy, float *gz){
     while(!IMU_data_available(fd)){
         std::this_thread::yield();
     }
@@ -89,24 +89,25 @@ void IMU_calibrate(int fd){
     gx_offset = 0;
     gy_offset = 0;
     gz_offset = 0;
-    double gx_sum = 0, gy_sum = 0, gz_sum = 0;
+    float gx_sum = 0, gy_sum = 0, gz_sum = 0;
     uint32_t data_count = 0;
     float prev_print_time = 0;
     float time = 0;
     auto start = std::chrono::system_clock::now();
     for(int i = 0;i<10000;i++){
-        double ax, ay, az, gx, gy, gz;
+        float ax, ay, az, gx, gy, gz;
         IMU_wait_and_get_data(fd, &ax, &ay, &az, &gx, &gy, &gz);
         gx_sum += gx;
         gy_sum += gy;
         gz_sum += gz;
         data_count++;
     }
-    double calibration_time = std::chrono::duration_cast<std::chrono::duration<float>>(std::chrono::system_clock::now()-start).count();
+    float calibration_time = std::chrono::duration_cast<std::chrono::duration<float>>(std::chrono::system_clock::now()-start).count();
+    float prev_dt = dt;
     dt = calibration_time/data_count;
-    gx_offset = -gx_sum/data_count;
-    gy_offset = -gy_sum/data_count;
-    gz_offset = -gz_sum/data_count;
+    gx_offset = -gx_sum/data_count*(dt/prev_dt);
+    gy_offset = -gy_sum/data_count*(dt/prev_dt);
+    gz_offset = -gz_sum/data_count*(dt/prev_dt);
     std::cout << "sample rate: " << data_count/calibration_time << " samples/sec, dt=" << dt << std::endl;
     std::cout << "gx_offset: " << gx_offset << " rad/sec" << std::endl;
     std::cout << "gy_offset: " << gy_offset << " rad/sec" << std::endl;
@@ -151,7 +152,7 @@ int main() {
     float prev_print_time = 0;
     float time = 0;
     while (true) {
-        double ax, ay, az, gx, gy, gz;
+        float ax, ay, az, gx, gy, gz;
         IMU_wait_and_get_data(fd, &ax, &ay, &az, &gx, &gy, &gz);
 
         imu_filter(ax, ay, az, gx, gy, gz);
