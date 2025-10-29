@@ -91,7 +91,7 @@ void IMU_calibrate(int fd){
     float prev_print_time = 0;
     float time = 0;
     auto start = std::chrono::system_clock::now();
-    for(int i = 0;i<10000;i++){
+    for(int i = 0;i<1000;i++){
         float ax, ay, az, gx, gy, gz;
         IMU_wait_and_get_data(fd, &ax, &ay, &az, &gx, &gy, &gz);
         gx_sum += gx;
@@ -100,7 +100,7 @@ void IMU_calibrate(int fd){
         data_count++;
     }
     float calibration_time = std::chrono::duration_cast<std::chrono::duration<float>>(std::chrono::system_clock::now()-start).count();
-    // dt = calibration_time/data_count;
+    dt = calibration_time/data_count;
     gx_offset += -gx_sum/data_count;
     gy_offset += -gy_sum/data_count;
     gz_offset += -gz_sum/data_count;
@@ -142,9 +142,9 @@ int main() {
     SPI_write(fd, CTRL2_G,  &ctrl2_g,  1);
 
     std::cout << "calibrating..." << std::endl;
-    IMU_calibrate(fd);
-    IMU_calibrate(fd);
-    IMU_calibrate(fd);
+    for(int i = 0;i<10;i++){
+        IMU_calibrate(fd);
+    }
 
     // Read loop
     float prev_print_time = 0;
