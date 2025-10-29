@@ -1,5 +1,5 @@
-// File: ld19_gatherer.cpp
-// Implementation for ld19_gatherer.hpp
+// ld19_gatherer.cpp
+// Implementation for ld19_gatherer.hpp (updated with robust indexing guards)
 
 #include "ld19_gatherer.hpp"
 
@@ -248,11 +248,15 @@ struct LD19Gatherer::Impl {
         }
     }
 
+    // robust mapping angle->bin index using floor-style division and clamping
     size_t angle_to_index(double ang_deg){
-        double a = fmod(ang_deg, 360.0);
-        if(a < 0) a += 360.0;
-        double step = 360.0 / double(bins);
-        size_t idx = static_cast<size_t>(std::round(a / step)) % bins;
+        // normalize to [0,360)
+        double a = std::fmod(ang_deg, 360.0);
+        if(a < 0.0) a += 360.0;
+        // compute index using floor to avoid rounding to bins
+        double pos = a * static_cast<double>(bins) / 360.0;
+        size_t idx = static_cast<size_t>(std::floor(pos));
+        if(idx >= bins) idx = bins - 1;
         return idx;
     }
 
@@ -275,6 +279,8 @@ struct LD19Gatherer::Impl {
             std::vector<std::pair<size_t, RecentInternal>> local_updates;
             for(const auto &p : pf.points){
                 size_t idx = angle_to_index(p.ang_deg);
+                // defensive: ensure idx in range
+                if(idx >= bins) continue;
                 RecentInternal ri{static_cast<float>(p.ang_deg), static_cast<float>(p.r_m), p.inten, now_ms};
                 local_updates.emplace_back(idx, ri);
             }
@@ -282,6 +288,10 @@ struct LD19Gatherer::Impl {
                 std::lock_guard<std::mutex> lk(mtx);
                 for(auto &u : local_updates){
                     size_t idx = u.first; const RecentInternal &ri = u.second;
+                    if(idx >= current_ranges.size() || idx >= current_intens.size() || idx >= last_update_ts.size()){
+                        // unexpected; skip to avoid crash
+                        continue;
+                    }
                     current_ranges[idx] = ri.range_m;
                     current_intens[idx] = ri.intensity;
                     last_update_ts[idx] = ri.ts_ms;
@@ -323,7 +333,6 @@ struct LD19Gatherer::Impl {
     std::mutex mtx;
 };
 
-// LD19Gatherer public methods
 LD19Gatherer::LD19Gatherer(const std::string& port, int baud, size_t bins, uint32_t recent_window_ms, double ser_timeout_s)
 : impl_(new Impl(port, baud, bins, recent_window_ms, ser_timeout_s)){}
 

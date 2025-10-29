@@ -14,7 +14,7 @@ def imu_thread():
         print("LIDAR > ", line.strip())
        
 
-threading.Thread(target=imu_thread).start()
+# threading.Thread(target=imu_thread).start()
 
 def getDistances():
     return 0,0,0
