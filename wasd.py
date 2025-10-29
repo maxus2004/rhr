@@ -1,103 +1,66 @@
-# ничего на роботах нормально не работает
-# по этому едем по правилу правой руки
-# как школьники которые в первый раз Arduino увидели
-
-import time
-import motors
-import imu
+import serial
 import threading
+from datetime import datetime
 
-targetYaw = 0
+# Open serial port
+ser = serial.Serial(port='/dev/ttyACM1', baudrate=115200, timeout=1)
 
+# Open log file in append mode
+log_file = open("esp32_data.txt", "a", buffering=1)  # line-buffered
 
-def getDistances():
-    return 0,0,0
+def log_line(prefix, line):
+    """Write a timestamped line to log file."""
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    log_file.write(f"[{timestamp}] {prefix}: {line}\n")
 
-def continueDriving():
-    motors.motorCommand(300,300)
-
-def stop():
-    motors.motorCommand(0,0)
-
-def fixAngleOverflow(a):
-    while a > 180:
-        a -= 360
-    while a < -180:
-        a += 360
-    return a
-
-def turnTo(targetYaw):
-    prevMoveTime = time.time()
-    prevMoveDirection = "forwards"
+def read_loop():
+    """Continuously read from serial and log output."""
     while True:
-        yaw = imu.getYaw()
-        error = fixAngleOverflow(targetYaw-yaw)
+        try:
+            line = ser.readline().decode(errors='ignore').strip()
+            if line:
+                print(f"< {line}")
+                log_line("IN", line)
+        except Exception as e:
+            print(f"Read error: {e}")
+            log_line("ERROR", str(e))
 
-        # move forward/backward a bit if stuck
-        if(time.time()-prevMoveTime > 2):
-            prevMoveTime = time.time()
-            if prevMoveDirection == "forwards":
-                motors.motorCommand(-300, -300)
-                prevMoveDirection = "backwards"
-            else:
-                motors.motorCommand(300, 300)
-                prevMoveDirection = "forwards"
-            time.sleep(0.1)
+# Start reader thread
+threading.Thread(target=read_loop, daemon=True).start()
 
-        # turn
-        if(error > 1):
-            motors.motorCommand(500, -500)
-        elif(error < -1):
-            motors.motorCommand(-500, 500)
-        else:
-            break
-        time.sleep(0.02)
-
-def turnRight():
-    global targetYaw
-    targetYaw = fixAngleOverflow(targetYaw+90)
-    turnTo(targetYaw)
-
-def turnLeft():
-    global targetYaw
-    targetYaw = fixAngleOverflow(targetYaw-90)
-    turnTo(targetYaw)
-
-
-state = "stop"
-
-def drive_loop():
-    global state
-    while True:
-        leftDistance, frontDistance, rightDistance = getDistances()
-
-        if state == "go":
-            continueDriving()
-        elif state == "back":
-            motors.motorCommand(-300,-300)
-        elif state == "right":
-            turnRight()
-            state = "stop"
-        elif state == "left":
-            turnLeft()
-            state = "stop"
-        else:
-            stop()
-
-        time.sleep(0.02)
-
-threading.Thread(target=drive_loop).start()
-
+# Main input loop
 while True:
-    c = input()
-    match c:
-        case "w":
-            state = "go"
-        case "s":
-            state = "back"
-        case "a":
-            state = "left"
-        case "d":
-            state = "right"
-        case _:
-            state = "stop"
+    try:
+        cmd = input("> ").strip()
+        msg = ""
+        match cmd:
+            case "w":
+                msg = '{"T":1,"L":100,"R":100}'
+            case "s":
+                msg = '{"T":1,"L":-100,"R":-100}'
+            case "a":
+                msg = '{"T":1,"L":-500,"R":500}'
+            case "d":
+                msg = '{"T":1,"L":500,"R":-500}'
+            case "":
+                msg = '{"T":1,"L":0,"R":0}'
+            case "start":
+                msg = '{"T":131,"cmd":1}'
+            case "stop":      
+                msg = '{"T":131,"cmd":0}'
+            case "exit":
+                print("Exiting...")
+                log_file.close()
+                ser.close()
+                break
+
+        if msg:
+            ser.write((msg + "\r\n").encode())
+            log_line("OUT", msg)
+            print(f"> {msg}")
+
+    except KeyboardInterrupt:
+        print("\nInterrupted by user.")
+        log_file.close()
+        ser.close()
+        break
