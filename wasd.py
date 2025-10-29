@@ -37,10 +37,10 @@ def turnTo(targetYaw):
         if(time.time()-prevMoveTime > 2):
             prevMoveTime = time.time()
             if prevMoveDirection == "forwards":
-                motors.motorCommand(-100, -100)
+                motors.motorCommand(-300, -300)
                 prevMoveDirection = "backwards"
             else:
-                motors.motorCommand(100, 100)
+                motors.motorCommand(300, 300)
                 prevMoveDirection = "forwards"
             time.sleep(0.5)
 
@@ -50,9 +50,9 @@ def turnTo(targetYaw):
         elif(error < -20):
             motors.motorCommand(-500, 500)
         elif(error > 5):
-            motors.motorCommand(100, -100)
+            motors.motorCommand(300, -300)
         elif(error < -5):
-            motors.motorCommand(-100, 100)
+            motors.motorCommand(-300, 300)
         else:
             break
         time.sleep(0.02)
