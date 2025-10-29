@@ -103,17 +103,6 @@ void IMU_calibrate(int fd){
         gy_sum += gy;
         gz_sum += gz;
         data_count++;
-        imu_filter(ax, ay, az, gx, gy, gz);
-        float roll,pitch,yaw;
-        eulerAngles(q_est,&roll,&pitch,&yaw);
-        time+=dt;
-        if(time>prev_print_time+0.02){
-            prev_print_time+=0.02;
-            std::cout << std::endl;
-            std::cout << "cal_yaw:   " << yaw << std::endl;
-            std::cout << "cal_pitch: " << pitch << std::endl;
-            std::cout << "cal_roll:  " << roll << std::endl;
-        }
     }
     q_est.q1 = 1;
     q_est.q2 = 0;
