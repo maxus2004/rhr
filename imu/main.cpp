@@ -149,7 +149,7 @@ int main() {
     SPI_write(fd, CTRL2_G,  &ctrl2_g,  1);
 
     std::cout << "calibrating..." << std::endl;
-    IMU_calibrate(fd);
+    // IMU_calibrate(fd);
 
     // Read loop
     float prev_print_time = 0;
