@@ -20,8 +20,6 @@
 #define OUTX_L_A        0x28
 #define STATUS_REG      0x1E
 
-float calibration_time = 1;
-
 float gyro_scale = 0.00122173; // rad/s/LSB
 float accel_scale = 0.000244;  // g/LSB
 float dt = 1/1666.0;
@@ -93,10 +91,10 @@ void IMU_calibrate(int fd){
     gz_offset = 0;
     float gx_sum = 0, gy_sum = 0, gz_sum = 0;
     uint32_t data_count = 0;
-    auto start = std::chrono::system_clock::now();
     float prev_print_time = 0;
     float time = 0;
-    while(std::chrono::system_clock::now()-start < std::chrono::duration<float>(calibration_time)){
+    auto start = std::chrono::system_clock::now();
+    for(int i = 0;i<10000;i++){
         float ax, ay, az, gx, gy, gz;
         IMU_wait_and_get_data(fd, &ax, &ay, &az, &gx, &gy, &gz);
         gx_sum += gx;
@@ -104,6 +102,7 @@ void IMU_calibrate(int fd){
         gz_sum += gz;
         data_count++;
     }
+    float calibration_time = std::chrono::duration_cast<std::chrono::duration<float>>(start-std::chrono::system_clock::now()).count();
     q_est.q1 = 1;
     q_est.q2 = 0;
     q_est.q3 = 0;
