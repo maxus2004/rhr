@@ -86,9 +86,6 @@ void IMU_wait_and_get_data(int fd, float *ax, float *ay, float *az, float *gx, f
 }
 
 void IMU_calibrate(int fd){
-    gx_offset = 0;
-    gy_offset = 0;
-    gz_offset = 0;
     float gx_sum = 0, gy_sum = 0, gz_sum = 0;
     uint32_t data_count = 0;
     float prev_print_time = 0;
@@ -104,9 +101,9 @@ void IMU_calibrate(int fd){
     }
     float calibration_time = std::chrono::duration_cast<std::chrono::duration<float>>(std::chrono::system_clock::now()-start).count();
     // dt = calibration_time/data_count;
-    gx_offset = -gx_sum/data_count;
-    gy_offset = -gy_sum/data_count;
-    gz_offset = -gz_sum/data_count;
+    gx_offset += -gx_sum/data_count;
+    gy_offset += -gy_sum/data_count;
+    gz_offset += -gz_sum/data_count;
     std::cout << "sample rate: " << data_count/calibration_time << " samples/sec, dt=" << dt << std::endl;
     std::cout << "gx_offset: " << gx_offset << " rad/sec" << std::endl;
     std::cout << "gy_offset: " << gy_offset << " rad/sec" << std::endl;
@@ -145,6 +142,8 @@ int main() {
     SPI_write(fd, CTRL2_G,  &ctrl2_g,  1);
 
     std::cout << "calibrating..." << std::endl;
+    IMU_calibrate(fd);
+    IMU_calibrate(fd);
     IMU_calibrate(fd);
 
     // Read loop
