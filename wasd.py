@@ -24,6 +24,7 @@ def fixAngleOverflow(a):
         a -= 360
     while a < -180:
         a += 360
+    return a
 
 def turnTo(targetYaw):
     prevMoveTime = time.time()
