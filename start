@@ -1,1 +1,1 @@
-python3 rhr.py
+sudo -E python3 rhr.py

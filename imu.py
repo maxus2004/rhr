@@ -1,11 +1,13 @@
 import subprocess
 import threading
+import os
 
 imu_process = subprocess.Popen(
     ["imu/build/imu"],
     stdout=subprocess.PIPE,
     stderr=subprocess.STDOUT,
-    text=True
+    text=True,
+    preexec_fn=lambda: os.nice(-10)
 )
 
 imu_yaw = 0
