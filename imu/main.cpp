@@ -104,7 +104,7 @@ void IMU_calibrate(int fd){
     }
     float calibration_time = std::chrono::duration_cast<std::chrono::duration<float>>(std::chrono::system_clock::now()-start).count();
     float prev_dt = dt;
-    dt = calibration_time/data_count;
+    // dt = calibration_time/data_count;
     gx_offset = -gx_sum/data_count/(dt/prev_dt);
     gy_offset = -gy_sum/data_count/(dt/prev_dt);
     gz_offset = -gz_sum/data_count/(dt/prev_dt);
