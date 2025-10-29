@@ -45,14 +45,10 @@ def turnTo(targetYaw):
             time.sleep(0.5)
 
         # turn
-        if(error > 20):
+        if(error > 1):
             motors.motorCommand(500, -500)
-        elif(error < -20):
+        elif(error < -1):
             motors.motorCommand(-500, 500)
-        elif(error > 5):
-            motors.motorCommand(300, -300)
-        elif(error < -5):
-            motors.motorCommand(-300, 300)
         else:
             break
         time.sleep(0.02)
