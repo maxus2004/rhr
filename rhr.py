@@ -5,6 +5,7 @@
 import time
 import motors
 import imu
+import threading
 
 targetYaw = 0
 
@@ -15,13 +16,17 @@ def getDistances():
 def continueDriving():
     motors.motorCommand(100,100)
 
+def stop():
+    motors.motorCommand(0,0)
+
 def fixAngleOverflow(a):
     while a > 180:
         a -= 360
     while a < -180:
         a += 360
+    return a
 
-def turnTo():
+def turnTo(targetYaw):
     prevMoveTime = time.time()
     prevMoveDirection = "forwards"
     while True:
@@ -29,30 +34,27 @@ def turnTo():
         error = fixAngleOverflow(targetYaw-yaw)
 
         # move forward/backward a bit if stuck
-        if(time.time()-prevMoveTime > 5):
+        if(time.time()-prevMoveTime > 2):
             prevMoveTime = time.time()
             if prevMoveDirection == "forwards":
-                motors.motorCommand(-100, -100)
+                motors.motorCommand(-300, -300)
                 prevMoveDirection = "backwards"
             else:
-                motors.motorCommand(100, 100)
+                motors.motorCommand(300, 300)
                 prevMoveDirection = "forwards"
-            time.sleep(0.1)
+            time.sleep(0.5)
 
         # turn
-        if(error > 20):
+        if(error > 1):
             motors.motorCommand(500, -500)
-        elif(error < -20):
+        elif(error < -1):
             motors.motorCommand(-500, 500)
-        if(error > 5):
-            motors.motorCommand(100, -100)
-        elif(error < -5):
-            motors.motorCommand(-100, 100)
         else:
             break
         time.sleep(0.02)
 
 def turnRight():
+    global targetYaw
     # drive forward a bit
     startTime = time.time()
     while(time.time()-startTime < 1):
@@ -64,6 +66,7 @@ def turnRight():
     turnTo(targetYaw)
 
 def turnLeft():
+    global targetYaw
     # drive forward a bit
     startTime = time.time()
     while(time.time()-startTime < 1):
