@@ -20,7 +20,7 @@
 #define OUTX_L_A        0x28
 #define STATUS_REG      0x1E
 
-float calibration_time = 1;
+float calibration_time = 5;
 
 float gyro_scale = 0.00122173; // rad/s/LSB
 float accel_scale = 0.000244;  // g/LSB
