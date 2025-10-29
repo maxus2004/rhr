@@ -101,7 +101,12 @@ void IMU_calibrate(int fd){
         gy_sum += gy;
         gz_sum += gz;
         data_count++;
+        imu_filter(ax, ay, az, gx, gy, gz);
     }
+    q_est.q1 = 1;
+    q_est.q2 = 0;
+    q_est.q3 = 0;
+    q_est.q4 = 0;
     dt = calibration_time/data_count;
     gx_offset = -gx_sum/data_count;
     gy_offset = -gy_sum/data_count;
