@@ -14,7 +14,7 @@ def getDistances():
     return 0,0,0
 
 def continueDriving():
-    motors.motorCommand(100,100)
+    motors.motorCommand(300,300)
 
 def stop():
     motors.motorCommand(0,0)

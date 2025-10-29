@@ -14,7 +14,7 @@ def getDistances():
     return 0,0,0
 
 def continueDriving():
-    motors.motorCommand(100,100)
+    motors.motorCommand(300,300)
 
 def stop():
     motors.motorCommand(0,0)
@@ -87,6 +87,8 @@ def drive_loop():
 
         if state == "go":
             continueDriving()
+        if state == "back":
+            motors.motorCommand(-300,-300)
         elif state == "right":
             turnRight()
             state = "go"
@@ -105,6 +107,8 @@ while True:
     match c:
         case "w":
             state = "go"
+        case "s":
+            state = "back"
         case "a":
             state = "left"
         case "d":
