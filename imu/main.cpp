@@ -135,6 +135,9 @@ int main() {
     }
 
     // Configure accelerometer and gyro
+    uint8_t a = 0x01;
+    SPI_write(fd,0x12,&a,1);
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
     uint8_t ctrl1_xl = 0b10001100;
     uint8_t ctrl2_g  = 0b10001100;
     SPI_write(fd, CTRL1_XL, &ctrl1_xl, 1);
