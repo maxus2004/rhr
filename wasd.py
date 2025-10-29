@@ -34,7 +34,7 @@ def turnTo(targetYaw):
         error = fixAngleOverflow(targetYaw-yaw)
 
         # move forward/backward a bit if stuck
-        if(time.time()-prevMoveTime > 5):
+        if(time.time()-prevMoveTime > 2):
             prevMoveTime = time.time()
             if prevMoveDirection == "forwards":
                 motors.motorCommand(-100, -100)
@@ -42,7 +42,7 @@ def turnTo(targetYaw):
             else:
                 motors.motorCommand(100, 100)
                 prevMoveDirection = "forwards"
-            time.sleep(0.1)
+            time.sleep(0.5)
 
         # turn
         if(error > 20):
