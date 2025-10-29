@@ -37,9 +37,14 @@ def getDistances():
     front_slice = [x for x in front_slice if x > 0]
     right_slice = [x for x in right_slice if x > 0]
     left_slice = [x for x in left_slice if x > 0]
-    if(len(front_slice) == 0 or len(right_slice) == 0 or len(left_slice) == 0): return 0,2,0
-    front = sum(front_slice)/len(front_slice)
-    right = sum(right_slice)/len(right_slice)
-    left = sum(left_slice)/len(left_slice)
+    front = 0
+    right = 0
+    left = 0
+    if(len(front_slice) != 0):
+        front = sum(front_slice)/len(front_slice)
+    if(len(right_slice) != 0):
+        right = sum(right_slice)/len(right_slice)
+    if(len(left_slice) != 0):
+        left = sum(left_slice)/len(left_slice)
     print(left, ", ",front,", ", right)
     return left,front,right
