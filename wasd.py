@@ -77,10 +77,10 @@ def drive_loop():
             motors.motorCommand(-300,-300)
         elif state == "right":
             turnRight()
-            state = "go"
+            state = "stop"
         elif state == "left":
             turnLeft()
-            state = "go"
+            state = "stop"
         else:
             stop()
 
