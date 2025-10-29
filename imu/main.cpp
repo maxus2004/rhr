@@ -91,9 +91,11 @@ void IMU_calibrate(int fd){
     gx_offset = 0;
     gy_offset = 0;
     gz_offset = 0;
-    double gx_sum = 0, gy_sum = 0, gz_sum = 0;
+    float gx_sum = 0, gy_sum = 0, gz_sum = 0;
     uint32_t data_count = 0;
     auto start = std::chrono::system_clock::now();
+    float prev_print_time = 0;
+    float time = 0;
     while(std::chrono::system_clock::now()-start < std::chrono::duration<float>(calibration_time)){
         float ax, ay, az, gx, gy, gz;
         IMU_wait_and_get_data(fd, &ax, &ay, &az, &gx, &gy, &gz);
@@ -102,6 +104,16 @@ void IMU_calibrate(int fd){
         gz_sum += gz;
         data_count++;
         imu_filter(ax, ay, az, gx, gy, gz);
+        float roll,pitch,yaw;
+        eulerAngles(q_est,&roll,&pitch,&yaw);
+        time+=dt;
+        if(time>prev_print_time+0.02){
+            prev_print_time+=0.02;
+            std::cout << std::endl;
+            std::cout << "cal_yaw:   " << yaw << std::endl;
+            std::cout << "cal_pitch: " << pitch << std::endl;
+            std::cout << "cal_roll:  " << roll << std::endl;
+        }
     }
     q_est.q1 = 1;
     q_est.q2 = 0;
@@ -149,7 +161,7 @@ int main() {
     SPI_write(fd, CTRL2_G,  &ctrl2_g,  1);
 
     std::cout << "calibrating..." << std::endl;
-    // IMU_calibrate(fd);
+    IMU_calibrate(fd);
 
     // Read loop
     float prev_print_time = 0;
