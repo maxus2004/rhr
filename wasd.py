@@ -87,7 +87,7 @@ def drive_loop():
 
         if state == "go":
             continueDriving()
-        if state == "back":
+        elif state == "back":
             motors.motorCommand(-300,-300)
         elif state == "right":
             turnRight()
