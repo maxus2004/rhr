@@ -55,25 +55,11 @@ def turnTo(targetYaw):
 
 def turnRight():
     global targetYaw
-    # drive forward a bit
-    startTime = time.time()
-    while(time.time()-startTime < 1):
-        continueDriving()
-        time.sleep(0.02)
-
-    # turn
     targetYaw = fixAngleOverflow(targetYaw+90)
     turnTo(targetYaw)
 
 def turnLeft():
     global targetYaw
-    # drive forward a bit
-    startTime = time.time()
-    while(time.time()-startTime < 1):
-        continueDriving()
-        time.sleep(0.02)
-
-    # turn
     targetYaw = fixAngleOverflow(targetYaw-90)
     turnTo(targetYaw)
 
