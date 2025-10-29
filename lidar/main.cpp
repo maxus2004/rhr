@@ -7,6 +7,7 @@
 // - --update-delay S (seconds between prints, default 1.0)
 // - --window WxH (e.g. 1024x800)
 // - --max-distance M (meters; draws & prints only <= M; used to compute zoom)
+// - --min-distance M (meters; ignores points closer than this threshold)
 
 #include "ld19_gatherer.hpp"
 #include "raylib.h"
@@ -34,6 +35,7 @@ int main(int argc, char** argv) {
     size_t dots = 3600; // default bins (3600 -> 0.1 deg resolution)
     int winw = 800, winh = 800;
     double max_distance_m = 6.0; // default max distance (meters)
+    double min_distance_m = 0.0; // default min distance (meters) - new flag
 
     // Parse args
     for (int i = 1; i < argc; ++i) {
@@ -63,12 +65,19 @@ int main(int argc, char** argv) {
             max_distance_m = std::atof(argv[++i]);
             if (!(max_distance_m > 0.0)) { std::cerr << "Invalid --max-distance, must be > 0\n"; return 1; }
         }
+        else if (std::strcmp(argv[i], "--min-distance") == 0 && i + 1 < argc) {
+            min_distance_m = std::atof(argv[++i]);
+            if (min_distance_m < 0.0) { std::cerr << "Invalid --min-distance, must be >= 0\n"; return 1; }
+        }
         else {
             std::cerr << "Unknown arg: " << argv[i] << "\n";
         }
     }
 
     if (update_delay_s <= 0.0) update_delay_s = 0.01;
+    if (min_distance_m >= max_distance_m) {
+        std::cerr << "Warning: --min-distance >= --max-distance; no points will be shown.\n";
+    }
 
     // Prepare gatherer
     ld19::LD19Gatherer g(port, baud, dots);
@@ -78,11 +87,10 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    // Compute a pixels-per-meter so max_distance_m fits in the window radius with a small margin
+    // Compute pixels-per-meter so max_distance_m fits in the window radius with a small margin
     const float margin = 8.0f;
     const float max_draw_r = std::min(winw, winh) / 2.0f - margin;
     float pixels_per_meter = (max_distance_m > 0.0) ? (max_draw_r / static_cast<float>(max_distance_m)) : (max_draw_r / 6.0f);
-    // clamp to reasonable range
     if (pixels_per_meter <= 0.0f) pixels_per_meter = 1.0f;
 
     // Snapshot buffer published by printer thread and consumed by renderer.
@@ -106,11 +114,11 @@ int main(int argc, char** argv) {
                 std::vector<uint8_t> intens;
                 g.getCurrentScanCopy(ranges, intens);
 
-                // Prepare snapshot points for rendering (only non-zero and <= max_distance become points)
+                // Prepare snapshot points for rendering (only points inside [min,max] are kept)
                 std::vector<ld19::LD19Gatherer::RecentPoint> snapshot_pts;
-                snapshot_pts.reserve(dots); // at most dots
+                snapshot_pts.reserve(dots);
 
-                // Print header with timestamp
+                // Print header with timestamp + parameters
                 auto t = std::chrono::system_clock::now();
                 std::time_t tt = std::chrono::system_clock::to_time_t(t);
                 std::tm tm = *std::localtime(&tt);
@@ -120,10 +128,11 @@ int main(int argc, char** argv) {
                           << " (requested_bins=" << dots
                           << ", returned_ranges=" << ranges.size()
                           << ", returned_intens=" << intens.size()
-                          << ", max_distance=" << max_distance_m << " m) ===\n";
+                          << ", min_distance=" << min_distance_m
+                          << ", max_distance=" << max_distance_m << ") ===\n";
                 std::cout << std::fixed << std::setprecision(6);
 
-                // Print exactly 'dots' lines; treat missing entries as zero.
+                // Print exactly 'dots' lines; treat missing entries or out-of-range as zero.
                 for (size_t i = 0; i < dots; ++i) {
                     double angle = 360.0 * double(i) / double(dots);
                     float range_val = 0.0f;
@@ -131,8 +140,8 @@ int main(int argc, char** argv) {
                     if (i < ranges.size()) range_val = ranges[i];
                     if (i < intens.size()) inten_val = intens[i];
 
-                    // If out of max_distance, treat as zero (i.e., ignore)
-                    if (range_val > static_cast<float>(max_distance_m)) {
+                    // Apply min/max filters: if outside range, treat as zero
+                    if (!(range_val >= static_cast<float>(min_distance_m) && range_val <= static_cast<float>(max_distance_m))) {
                         range_val = 0.0f;
                         inten_val = 0;
                     }
@@ -180,9 +189,8 @@ int main(int argc, char** argv) {
                 pts_copy = display_points; // small copy
             }
             for (const auto &p : pts_copy) {
-                if (p.range_m <= 0.01f) continue;
-                // safety: also ignore any point that (somehow) exceeds max_distance
-                if (p.range_m > static_cast<float>(max_distance_m)) continue;
+                if (p.range_m <= 0.0f) continue;
+                if (p.range_m < static_cast<float>(min_distance_m) || p.range_m > static_cast<float>(max_distance_m)) continue;
                 float angle_rad = p.angle_deg * (float)(M_PI / 180.0);
                 float x = center.x + sinf(angle_rad) * p.range_m * pixels_per_meter;
                 float y = center.y - cosf(angle_rad) * p.range_m * pixels_per_meter;
@@ -192,15 +200,14 @@ int main(int argc, char** argv) {
                     static_cast<unsigned char>(0),
                     static_cast<unsigned char>(255)
                 };
-                // draw single-pixel dot
                 DrawPixelV({ x, y }, c);
             }
         } else {
             std::vector<ld19::LD19Gatherer::RecentPoint> live_pts;
             g.getRecentUpdates(live_pts);
             for (const auto &p : live_pts) {
-                if (p.range_m <= 0.01f) continue;
-                if (p.range_m > static_cast<float>(max_distance_m)) continue;
+                if (p.range_m <= 0.0f) continue;
+                if (p.range_m < static_cast<float>(min_distance_m) || p.range_m > static_cast<float>(max_distance_m)) continue;
                 float angle_rad = p.angle_deg * (float)(M_PI / 180.0);
                 float x = center.x + sinf(angle_rad) * p.range_m * pixels_per_meter;
                 float y = center.y - cosf(angle_rad) * p.range_m * pixels_per_meter;
