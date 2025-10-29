@@ -5,13 +5,10 @@
 import time
 import motors
 import imu
+import lidar
 import threading
 
 targetYaw = 0
-
-
-def getDistances():
-    return 0,0,0
 
 def continueDriving():
     motors.motorCommand(300,300)
@@ -69,7 +66,7 @@ state = "stop"
 def drive_loop():
     global state
     while True:
-        leftDistance, frontDistance, rightDistance = getDistances()
+        leftDistance, frontDistance, rightDistance = lidar.getDistances()
 
         if state == "go":
             continueDriving()

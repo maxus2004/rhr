@@ -1,0 +1,547 @@
+// ld19_view_clean_full.cpp
+// C++17 realtime LD19 viewer with Raylib GUI
+// Build (Linux/macOS):
+//   g++ -std=c++17 -O2 -pthread ld19_view_clean_full.cpp -o ld19_view_clean $(pkg-config --cflags --libs raylib)
+// Usage example:
+//   ./ld19_view_clean --port /dev/pts/3 --baud 230400 --rmax 6.0 --window 1024x800 --crc-method ld19
+
+#include <iostream>
+#include <vector>
+#include <deque>
+#include <string>
+#include <thread>
+#include <mutex>
+#include <condition_variable>
+#include <chrono>
+#include <atomic>
+#include <cstdint>
+#include <cstring>
+#include <cmath>
+#include <algorithm>
+#include <optional>
+#include <fcntl.h>
+#include <unistd.h>
+#include <termios.h>
+#include <sys/select.h>
+#include <sys/time.h>
+#include <getopt.h>
+
+// Raylib
+#include "raylib.h"
+
+#ifndef M_PI
+#define M_PI 3.14159265358979323846
+#endif
+
+// Constants
+static const uint8_t HEADER = 0x54;
+static const uint8_t VERLEN = 0x2C;
+static const size_t FRAME_LEN = 47;
+static const int POINTS_PER_PACK = 12;
+static const int BYTES_PER_POINT = 3;
+
+// Utility: read little-endian uint16 from buffer
+static uint16_t le16(const uint8_t* p) { return uint16_t(p[0]) | (uint16_t(p[1]) << 8); }
+
+// Checksum functions
+static uint8_t sum8(const std::vector<uint8_t>& data){ uint32_t s=0; for(auto b:data) s+=b; return uint8_t(s & 0xFF); }
+static uint8_t crc8_maxim(const std::vector<uint8_t>& data){ uint8_t crc=0x00; for(auto b:data){ crc ^= b; for(int i=0;i<8;++i){ if(crc & 0x01) crc = (crc >> 1) ^ 0x8C; else crc >>= 1; } } return crc; }
+static uint8_t crc8_itu(const std::vector<uint8_t>& data){ uint8_t crc=0x00; for(auto b:data){ crc ^= b; for(int i=0;i<8;++i){ if(crc & 0x80) crc = uint8_t(((crc << 1) & 0xFF) ^ 0x07); else crc = uint8_t((crc << 1) & 0xFF); } } return crc; }
+static uint8_t crc8_j1850(const std::vector<uint8_t>& data){ uint8_t crc=0xFF; for(auto b:data){ crc ^= b; for(int i=0;i<8;++i){ if(crc & 0x80) crc = uint8_t(((crc << 1) & 0xFF) ^ 0x1D); else crc = uint8_t((crc << 1) & 0xFF); } } crc ^= 0xFF; return crc; }
+
+enum class CrcMethod { AUTO, SUM8, MAXIM, ITU, J1850, LD19 };
+
+// LD19 CRC8 table (from LD19 manual)
+static const uint8_t LD19_CRC_TABLE[256] = {
+0x00,0x4d,0x9a,0xd7,0x79,0x34,0xe3,0xae,0xf2,0xbf,0x68,0x25,0x8b,0xc6,0x11,0x5c,
+0xa9,0xe4,0x33,0x7e,0xd0,0x9d,0x4a,0x07,0x5b,0x16,0xc1,0x8c,0x22,0x6f,0xb8,0xf5,
+0x1f,0x52,0x85,0xc8,0x66,0x2b,0xfc,0xb1,0xed,0xa0,0x77,0x3a,0x94,0xd9,0x0e,0x43,
+0xb6,0xfb,0x2c,0x61,0xcf,0x82,0x55,0x18,0x44,0x09,0xde,0x93,0x3d,0x70,0xa7,0xea,
+0x3e,0x73,0xa4,0xe9,0x47,0x0a,0xdd,0x90,0xcc,0x81,0x56,0x1b,0xb5,0xf8,0x2f,0x62,
+0x97,0xda,0x0d,0x40,0xee,0xa3,0x74,0x39,0x65,0x28,0xff,0xb2,0x1c,0x51,0x86,0xcb,
+0x21,0x6c,0xbb,0xf6,0x58,0x15,0xc2,0x8f,0xd3,0x9e,0x49,0x04,0xaa,0xe7,0x30,0x7d,
+0x88,0xc5,0x12,0x5f,0xf1,0xbc,0x6b,0x26,0x7a,0x37,0xe0,0xad,0x03,0x4e,0x99,0xd4,
+0x7c,0x31,0xe6,0xab,0x05,0x48,0x9f,0xd2,0x8e,0xc3,0x14,0x59,0xf7,0xba,0x6d,0x20,
+0xd5,0x98,0x4f,0x02,0xac,0xe1,0x36,0x7b,0x27,0x6a,0xbd,0xf0,0x5e,0x13,0xc4,0x89,
+0x63,0x2e,0xf9,0xb4,0x1a,0x57,0x80,0xcd,0x91,0xdc,0x0b,0x46,0xe8,0xa5,0x72,0x3f,
+0xca,0x87,0x50,0x1d,0xb3,0xfe,0x29,0x64,0x38,0x75,0xa2,0xef,0x41,0x0c,0xdb,0x96,
+0x42,0x0f,0xd8,0x95,0x3b,0x76,0xa1,0xec,0xb0,0xfd,0x2a,0x67,0xc9,0x84,0x53,0x1e,
+0xeb,0xa6,0x71,0x3c,0x92,0xdf,0x08,0x45,0x19,0x54,0x83,0xce,0x60,0x2d,0xfa,0xb7,
+0x5d,0x10,0xc7,0x8a,0x24,0x69,0xbe,0xf3,0xaf,0xe2,0x35,0x78,0xd6,0x9b,0x4c,0x01,
+0xf4,0xb9,0x6e,0x23,0x8d,0xc0,0x17,0x5a,0x06,0x4b,0x9c,0xd1,0x7f,0x32,0xe5,0xa8
+};
+
+static uint8_t crc8_ld19(const std::vector<uint8_t>& data){
+    uint8_t crc = 0;
+    for(auto b : data){
+        crc = LD19_CRC_TABLE[(crc ^ b) & 0xFF];
+    }
+    return crc;
+}
+
+static bool checksum_ok(const std::vector<uint8_t>& frame, CrcMethod method){
+    if(frame.size() < 1) return false;
+    std::vector<uint8_t> body(frame.begin(), frame.end() - 1);
+    uint8_t tail = frame.back();
+    if(method == CrcMethod::SUM8) return sum8(body) == tail;
+    if(method == CrcMethod::MAXIM) return crc8_maxim(body) == tail;
+    if(method == CrcMethod::ITU) return crc8_itu(body) == tail;
+    if(method == CrcMethod::J1850) return crc8_j1850(body) == tail;
+    if(method == CrcMethod::LD19) return crc8_ld19(body) == tail;
+    // AUTO: try known methods
+    if(sum8(body) == tail) return true;
+    if(crc8_maxim(body) == tail) return true;
+    if(crc8_itu(body) == tail) return true;
+    if(crc8_j1850(body) == tail) return true;
+    if(crc8_ld19(body) == tail) return true;
+    return false;
+}
+
+// POSIX serial helper
+class SerialPort {
+public:
+    SerialPort(): fd_(-1), timeout_s_(0.02){}
+    ~SerialPort(){ closePort(); }
+    bool openPort(const std::string& path, int baud, double timeout_s){
+        fd_ = open(path.c_str(), O_RDWR | O_NOCTTY | O_NONBLOCK);
+        if(fd_ < 0){ perror("open"); return false; }
+        struct termios tio; memset(&tio, 0, sizeof(tio));
+        if(tcgetattr(fd_, &tio) != 0){ perror("tcgetattr"); return false; }
+        cfmakeraw(&tio);
+        speed_t speed = B115200;
+        switch(baud){
+            case 9600: speed = B9600; break;
+            case 19200: speed = B19200; break;
+            case 38400: speed = B38400; break;
+            case 57600: speed = B57600; break;
+            case 115200: speed = B115200; break;
+            case 230400: speed = B230400; break;
+            default: speed = B115200; break;
+        }
+        cfsetspeed(&tio, speed);
+        tio.c_cflag |= CLOCAL | CREAD;
+        tio.c_cflag &= ~CSTOPB;
+        tio.c_cflag &= ~CSIZE;
+        tio.c_cflag |= CS8;
+        tio.c_iflag = 0;
+        tio.c_oflag = 0;
+        tio.c_lflag = 0;
+        tio.c_cc[VMIN] = 0;
+        tio.c_cc[VTIME] = 0;
+        if(tcsetattr(fd_, TCSANOW, &tio) != 0){ perror("tcsetattr"); return false; }
+        timeout_s_ = timeout_s;
+        return true;
+    }
+    void closePort(){ if(fd_ >= 0){ close(fd_); fd_ = -1; } }
+    // append up to max_bytes into buf
+    ssize_t readToBuffer(std::vector<uint8_t>& buf, size_t max_bytes){
+        if(fd_ < 0) return -1;
+        fd_set rfds; FD_ZERO(&rfds); FD_SET(fd_, &rfds);
+        struct timeval tv; tv.tv_sec = static_cast<long>(timeout_s_);
+        tv.tv_usec = static_cast<long>((timeout_s_ - floor(timeout_s_)) * 1e6);
+        int rv = select(fd_ + 1, &rfds, nullptr, nullptr, &tv);
+        if(rv <= 0) return 0;
+        size_t toread = std::min<size_t>(max_bytes, 512);
+        std::vector<uint8_t> tmp(toread);
+        ssize_t r = ::read(fd_, tmp.data(), toread);
+        if(r > 0){ buf.insert(buf.end(), tmp.begin(), tmp.begin() + r); return r; }
+        return r;
+    }
+    bool readExact(uint8_t* out, size_t n){
+        if(fd_ < 0) return false;
+        size_t got = 0;
+        auto start = std::chrono::steady_clock::now();
+        while(got < n){
+            fd_set rfds; FD_ZERO(&rfds); FD_SET(fd_, &rfds);
+            struct timeval tv; tv.tv_sec = static_cast<long>(timeout_s_);
+            tv.tv_usec = static_cast<long>((timeout_s_ - floor(timeout_s_)) * 1e6);
+            int rv = select(fd_ + 1, &rfds, nullptr, nullptr, &tv);
+            if(rv <= 0) return false;
+            ssize_t r = ::read(fd_, out + got, n - got);
+            if(r <= 0) return false;
+            got += r;
+            auto now = std::chrono::steady_clock::now();
+            if(std::chrono::duration<double>(now - start).count() > timeout_s_ * 5.0) return false;
+        }
+        return true;
+    }
+private:
+    int fd_;
+    double timeout_s_;
+};
+
+// Point & frame structures
+struct Point { double ang_deg; double r_m; uint8_t inten; };
+struct ParsedFrame { uint16_t speed; double start_deg; double end_deg; uint16_t timestamp_ms; std::vector<Point> points; };
+
+static std::optional<ParsedFrame> parse_frame(const std::vector<uint8_t>& frame){
+    if(frame.size() != FRAME_LEN) return std::nullopt;
+    if(frame[0] != HEADER || frame[1] != VERLEN) return std::nullopt;
+    uint16_t speed = le16(&frame[2]);
+    uint16_t start_angle = le16(&frame[4]);
+    std::vector<std::pair<uint16_t,uint8_t>> pts;
+    size_t off = 6;
+    for(int i = 0; i < POINTS_PER_PACK; ++i){
+        if(off + BYTES_PER_POINT > frame.size()) break;
+        uint16_t dist_mm = le16(&frame[off]);
+        uint8_t inten = frame[off + 2];
+        pts.emplace_back(dist_mm, inten);
+        off += BYTES_PER_POINT;
+    }
+    uint16_t end_angle = 0, ts_ms = 0;
+    if(42 + 4 <= frame.size()){
+        end_angle = le16(&frame[42]);
+        ts_ms = le16(&frame[44]);
+    }
+    double start_deg = double(start_angle % 36000) / 100.0;
+    double end_deg = double(end_angle % 36000) / 100.0;
+    double angle_diff = fmod((end_deg - start_deg) + 360.0, 360.0);
+    double step = (POINTS_PER_PACK > 1) ? (angle_diff / (POINTS_PER_PACK - 1)) : 0.0;
+    std::vector<Point> decoded;
+    for(size_t i = 0; i < pts.size(); ++i){
+        double ang_deg = fmod(start_deg + double(i) * step, 360.0);
+        uint16_t dist_mm = pts[i].first;
+        uint8_t inten = pts[i].second;
+        if(dist_mm == 0 || dist_mm == 0xFFFF) continue;
+        decoded.push_back({ang_deg, double(dist_mm) / 1000.0, inten});
+    }
+    return ParsedFrame{speed, start_deg, end_deg, ts_ms, decoded};
+}
+
+// Buffered sync
+static std::optional<std::vector<uint8_t>> sync_and_read_frame_buffered(SerialPort& ser, double timeout_s, CrcMethod crc_method, std::atomic<size_t>* stat_frames_read = nullptr, std::atomic<size_t>* stat_checksum_fail = nullptr, std::atomic<size_t>* stat_buffer_trims = nullptr){
+    auto start = std::chrono::steady_clock::now();
+    std::vector<uint8_t> buf;
+    while(std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count() < timeout_s){
+        ssize_t r = ser.readToBuffer(buf, 128);
+        if(r < 0) return std::nullopt;
+        if(r == 0) continue;
+        size_t i = 0;
+        while(i + 1 <= buf.size() - 2){
+            if(buf[i] == HEADER && buf[i+1] == VERLEN){
+                if(buf.size() - i < FRAME_LEN) break;
+                std::vector<uint8_t> frame(buf.begin() + i, buf.begin() + i + FRAME_LEN);
+                if(checksum_ok(frame, crc_method)){
+                    if(stat_frames_read) ++(*stat_frames_read);
+                    buf.erase(buf.begin(), buf.begin() + i + FRAME_LEN);
+                    return frame;
+                } else {
+                    if(stat_checksum_fail) ++(*stat_checksum_fail);
+                }
+                ++i;
+                continue;
+            }
+            ++i;
+        }
+        if(buf.size() > 4096){
+            if(stat_buffer_trims) ++(*stat_buffer_trims);
+            buf.erase(buf.begin(), buf.begin() + 2048);
+        }
+    }
+    return std::nullopt;
+}
+
+// Header-first deterministic sync
+static std::optional<std::vector<uint8_t>> sync_and_read_frame_header_first(SerialPort& ser, double timeout_s, CrcMethod crc_method, std::atomic<size_t>* stat_frames_read = nullptr, std::atomic<size_t>* stat_checksum_fail = nullptr, std::atomic<size_t>* stat_partial_reads = nullptr){
+    auto deadline = std::chrono::steady_clock::now() + std::chrono::duration<double>(timeout_s);
+    while(std::chrono::steady_clock::now() < deadline){
+        uint8_t b;
+        if(!ser.readExact(&b, 1)) continue;
+        if(b != HEADER) continue;
+        uint8_t b2;
+        if(!ser.readExact(&b2, 1)) continue;
+        if(b2 != VERLEN) continue;
+        std::vector<uint8_t> rest(FRAME_LEN - 2);
+        bool ok = ser.readExact(rest.data(), rest.size());
+        if(!ok){ if(stat_partial_reads) ++(*stat_partial_reads); continue; }
+        std::vector<uint8_t> frame;
+        frame.push_back(HEADER);
+        frame.push_back(VERLEN);
+        frame.insert(frame.end(), rest.begin(), rest.end());
+        if(checksum_ok(frame, crc_method)){
+            if(stat_frames_read) ++(*stat_frames_read);
+            return frame;
+        } else {
+            if(stat_checksum_fail) ++(*stat_checksum_fail);
+            continue;
+        }
+    }
+    return std::nullopt;
+}
+
+// Thread-safe bounded queue with drop policies (simple)
+class FrameQueue {
+public:
+    FrameQueue(size_t maxsize): maxsize_(std::max<size_t>(1, maxsize)){}
+    bool push(const ParsedFrame& f, const std::string& policy, bool block){
+        std::unique_lock<std::mutex> lk(m_);
+        if(policy == "block"){
+            not_full_.wait(lk, [this]{ return q_.size() < maxsize_; });
+            q_.push_back(f);
+            not_empty_.notify_one();
+            return true;
+        }
+        if(q_.size() >= maxsize_){
+            if(policy == "drop_oldest"){
+                q_.pop_front();
+                q_.push_back(f);
+                not_empty_.notify_one();
+                return true;
+            } else if(policy == "drop_newest"){
+                return false;
+            }
+        } else {
+            q_.push_back(f);
+            not_empty_.notify_one();
+            return true;
+        }
+        return false;
+    }
+    std::optional<ParsedFrame> drain_keep_latest(){
+        std::unique_lock<std::mutex> lk(m_);
+        if(q_.empty()) return std::nullopt;
+        ParsedFrame last = q_.back();
+        q_.clear();
+        not_full_.notify_all();
+        return last;
+    }
+private:
+    std::deque<ParsedFrame> q_;
+    size_t maxsize_;
+    std::mutex m_;
+    std::condition_variable not_empty_;
+    std::condition_variable not_full_;
+};
+
+// Reader thread
+static void reader_thread_fn(SerialPort& ser, FrameQueue& fq, std::atomic<bool>& stop_event, bool header_first, double timeout_s, CrcMethod crc_method, std::atomic<size_t>& stat_frames_read, std::atomic<size_t>& stat_checksum_fail, std::atomic<size_t>& stat_buffer_trims, std::atomic<size_t>& stat_partial_reads, const std::string& drop_policy){
+    while(!stop_event.load()){
+        std::optional<std::vector<uint8_t>> frame_raw;
+        if(header_first) frame_raw = sync_and_read_frame_header_first(ser, timeout_s, crc_method, &stat_frames_read, &stat_checksum_fail, &stat_partial_reads);
+        else frame_raw = sync_and_read_frame_buffered(ser, timeout_s, crc_method, &stat_frames_read, &stat_checksum_fail, &stat_buffer_trims);
+        if(!frame_raw.has_value()) continue;
+        auto parsed = parse_frame(frame_raw.value());
+        if(!parsed.has_value()) continue;
+        fq.push(parsed.value(), drop_policy, false);
+    }
+}
+
+// Simple args
+struct Args {
+    std::string port = "/dev/ttyUSB0";
+    int baud = 230400;
+    double timeout = 0.02;
+    double rmax = 6.0;
+    bool threaded = true;
+    bool header_first = false;
+    CrcMethod crc_method = CrcMethod::AUTO;
+    int frame_queue_size = 256;
+    std::string drop_policy = "drop_oldest";
+    int winw = 1024, winh = 800;
+    float markersize = 3.0f;
+    double fade_tau = 0.5; // seconds
+    int accum = 0; // number of frames to accumulate (0 = off)
+};
+
+static void print_usage(const char* prog){
+    std::cerr << "Usage: " << prog << " [--port PATH] [--baud N] [--rmax meters] [--window WxH] [--markersize N] [--fade-tau S] [--accum N] [--crc-method auto|sum8|maxim|itu|j1850|ld19]\n";
+}
+
+int main(int argc, char** argv){
+    Args args;
+    static struct option long_options[] = {
+        {"port", required_argument, 0, 'p'},
+        {"baud", required_argument, 0, 'b'},
+        {"rmax", required_argument, 0, 0},
+        {"header-first", no_argument, 0, 0},
+        {"crc-method", required_argument, 0, 0},
+        {"window", required_argument, 0, 0},
+        {"markersize", required_argument, 0, 0},
+        {"fade-tau", required_argument, 0, 0},
+        {"accum", required_argument, 0, 0},
+        {0,0,0,0}
+    };
+    int opt; int optidx = 0;
+    while((opt = getopt_long(argc, argv, "p:b:", long_options, &optidx)) != -1){
+        if(opt == 'p') args.port = optarg;
+        else if(opt == 'b') args.baud = atoi(optarg);
+        else if(opt == 0){
+            std::string name = long_options[optidx].name ? long_options[optidx].name : std::string();
+            if(name == "rmax") args.rmax = atof(optarg);
+            else if(name == "header-first") args.header_first = true;
+            else if(name == "crc-method"){
+                std::string cm(optarg);
+                if(cm == "auto") args.crc_method = CrcMethod::AUTO;
+                else if(cm == "sum8") args.crc_method = CrcMethod::SUM8;
+                else if(cm == "maxim") args.crc_method = CrcMethod::MAXIM;
+                else if(cm == "itu") args.crc_method = CrcMethod::ITU;
+                else if(cm == "j1850") args.crc_method = CrcMethod::J1850;
+                else if(cm == "ld19") args.crc_method = CrcMethod::LD19;
+                else { std::cerr << "Unknown crc-method\n"; return 1; }
+            } else if(name == "window"){
+                std::string w(optarg);
+                size_t x = w.find('x');
+                if(x != std::string::npos){ args.winw = atoi(w.substr(0,x).c_str()); args.winh = atoi(w.substr(x+1).c_str()); }
+            } else if(name == "markersize"){
+                args.markersize = atof(optarg);
+            } else if(name == "fade-tau"){
+                args.fade_tau = atof(optarg);
+            } else if(name == "accum"){
+                args.accum = atoi(optarg);
+            }
+        }
+    }
+
+    std::cout << "[LD19] Opening " << args.port << " @ " << args.baud << "\n";
+    SerialPort ser;
+    if(!ser.openPort(args.port, args.baud, args.timeout)){
+        std::cerr << "Failed to open serial port " << args.port << "\n";
+        return 2;
+    }
+
+    std::atomic<size_t> stat_frames_read{0}, stat_checksum_fail{0}, stat_buffer_trims{0}, stat_partial_reads{0};
+    FrameQueue fq(args.frame_queue_size);
+    std::atomic<bool> stop_event{false};
+    std::thread reader_thread;
+    if(args.threaded){
+        reader_thread = std::thread(reader_thread_fn, std::ref(ser), std::ref(fq), std::ref(stop_event), args.header_first, args.timeout, args.crc_method, std::ref(stat_frames_read), std::ref(stat_checksum_fail), std::ref(stat_buffer_trims), std::ref(stat_partial_reads), args.drop_policy);
+    }
+
+    // Raylib init
+    InitWindow(args.winw, args.winh, "archbtw");
+    SetTargetFPS(60);
+
+    const float cx = args.winw / 2.0f;
+    const float cy = args.winh / 2.0f;
+    const float margin = 40.0f;
+    const float max_draw_r = std::min(args.winw, args.winh) / 2.0f - margin;
+    const float pixels_per_meter = float(max_draw_r) / float(args.rmax);
+
+    double angle_offset = 0.0; // degrees
+    bool clockwise = false;
+
+    size_t frames_processed = 0;
+    auto last_print = std::chrono::steady_clock::now();
+
+    // rendering loop variables
+    std::deque<std::tuple<float,float,uint8_t,double>> render_points;
+    std::mutex render_mtx;
+
+    while(!WindowShouldClose()){
+        // get latest frame
+        std::optional<ParsedFrame> parsed_opt;
+        if(args.threaded) parsed_opt = fq.drain_keep_latest();
+        else {
+            auto frame_raw = sync_and_read_frame_buffered(ser, args.timeout, args.crc_method, &stat_frames_read, &stat_checksum_fail, &stat_buffer_trims);
+            if(frame_raw.has_value()) parsed_opt = parse_frame(frame_raw.value());
+        }
+
+        if(parsed_opt.has_value()){
+            ParsedFrame parsed = parsed_opt.value();
+            ++frames_processed;
+            double now_ts = std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count();
+            std::vector<std::tuple<float,float,uint8_t,double>> new_pts;
+            for(const auto &p: parsed.points){
+                double ang = p.ang_deg;
+                if(clockwise) ang = -ang;
+                ang = fmod(ang + angle_offset + 360.0, 360.0);
+                double rad = ang * M_PI / 180.0;
+                double r_m = p.r_m;
+                float px = cx + float(cos(rad) * r_m * pixels_per_meter);
+                float py = cy - float(sin(rad) * r_m * pixels_per_meter);
+                new_pts.emplace_back(px, py, p.inten, now_ts);
+            }
+            // If parsed frame has no points, avoid clearing the display (likely a sparse frame)
+            if(!new_pts.empty()){
+                std::lock_guard<std::mutex> lk(render_mtx);
+                if(args.accum > 0){
+                    for(auto &pt : new_pts) render_points.push_back(pt);
+                    size_t max_pts = size_t(POINTS_PER_PACK) * size_t(std::max(1, args.accum));
+                    while(render_points.size() > max_pts) render_points.pop_front();
+                } else {
+                    render_points.clear();
+                    for(auto &pt : new_pts) render_points.push_back(pt);
+                }
+            } else {
+                // new_pts empty -> do not clear existing render_points
+            }
+        }
+
+        // handle input for angle offset
+        if(IsKeyPressed(KEY_LEFT)) angle_offset -= 1.0;
+        if(IsKeyPressed(KEY_RIGHT)) angle_offset += 1.0;
+        if(IsKeyPressed(KEY_A)) angle_offset -= 1.0;
+        if(IsKeyPressed(KEY_D)) angle_offset += 1.0;
+
+        BeginDrawing();
+        ClearBackground(BLACK);
+
+        // draw range circles
+        DrawCircleLines((int)cx, (int)cy, (int)(max_draw_r), GRAY);
+        DrawCircleLines((int)cx, (int)cy, (int)(max_draw_r * 0.66f), GRAY);
+        DrawCircleLines((int)cx, (int)cy, (int)(max_draw_r * 0.33f), GRAY);
+
+        // draw cross center
+        DrawLine((int)cx - 10, (int)cy, (int)cx + 10, (int)cy, DARKGRAY);
+        DrawLine((int)cx, (int)cy - 10, (int)cx, (int)cy + 10, DARKGRAY);
+
+        // snapshot points for rendering
+        std::deque<std::tuple<float,float,uint8_t,double>> snapshot;
+        {
+            std::lock_guard<std::mutex> lk(render_mtx);
+            snapshot = render_points;
+        }
+        double now_ts = std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count();
+
+        // Render and age/truncate points based on fade_tau
+        double fade_tau = args.fade_tau;
+        std::deque<std::tuple<float,float,uint8_t,double>> next_render_points;
+        for(const auto &t: snapshot){
+            float x = std::get<0>(t);
+            float y = std::get<1>(t);
+            uint8_t inten = std::get<2>(t);
+            double ts = std::get<3>(t);
+            double age = now_ts - ts;
+            float alpha = 1.0f;
+            if(fade_tau > 0.0){
+                double expa = std::exp(-age / fade_tau);
+                alpha = std::max(0.02f, float(expa));
+            }
+            if(alpha < 0.025f) continue;
+            float v = std::min(1.0f, inten / 255.0f);
+            unsigned char col = static_cast<unsigned char>(std::round(255.0f * v));
+            Color c = { col, static_cast<unsigned char>(col/2), static_cast<unsigned char>(255 - col), static_cast<unsigned char>(std::round(255.0f * alpha)) };
+            DrawCircleV({x,y}, args.markersize, c);
+            next_render_points.push_back(t);
+        }
+
+        if(args.accum > 0){
+            std::lock_guard<std::mutex> lk(render_mtx);
+            render_points.swap(next_render_points);
+        }
+
+        // HUD
+        DrawText(TextFormat("LD19 — rmax=%.2fm  pts=%d", args.rmax, (int)snapshot.size()), 10, 10, 18, RAYWHITE);
+        DrawText(TextFormat("frames=%zu", frames_processed), 10, 30, 14, RAYWHITE);
+        DrawText(TextFormat("angle_offset=%.1f deg", angle_offset), 10, 50, 14, RAYWHITE);
+
+        EndDrawing();
+
+        // occasional stats to stdout
+        auto tp = std::chrono::steady_clock::now();
+        if(std::chrono::duration<double>(tp - last_print).count() > 1.0){
+            last_print = tp;
+            std::cout << "STATS frames_read=" << stat_frames_read.load()
+                      << " chk_fail=" << stat_checksum_fail.load()
+                      << " buf_trims=" << stat_buffer_trims.load()
+                      << " partial_reads=" << stat_partial_reads.load() << "\n";
+        }
+    }
+
+    // cleanup
+    stop_event.store(true);
+    if(reader_thread.joinable()) reader_thread.join();
+    ser.closePort();
+    CloseWindow();
+    return 0;
+}
