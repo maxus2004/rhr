@@ -42,7 +42,7 @@ def turnTo(targetYaw):
             else:
                 motors.motorCommand(300, 300)
                 prevMoveDirection = "forwards"
-            time.sleep(0.5)
+            time.sleep(0.1)
 
         # turn
         if(error > 1):
