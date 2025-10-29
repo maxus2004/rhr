@@ -91,7 +91,7 @@ void IMU_calibrate(int fd){
     gx_offset = 0;
     gy_offset = 0;
     gz_offset = 0;
-    float gx_sum = 0, gy_sum = 0, gz_sum = 0;
+    double gx_sum = 0, gy_sum = 0, gz_sum = 0;
     uint32_t data_count = 0;
     auto start = std::chrono::system_clock::now();
     while(std::chrono::system_clock::now()-start < std::chrono::duration<float>(calibration_time)){
