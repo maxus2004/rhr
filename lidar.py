@@ -35,17 +35,22 @@ def getDistances():
     front_slice = lidar_distances[0:slice_size] + lidar_distances[359-slice_size:359]
     right_slice = lidar_distances[90-slice_size:90+slice_size]
     left_slice = lidar_distances[270-slice_size:270+slice_size]
+    back_slice = lidar_distances[180-slice_size:180+slice_size]
     front_slice = [x for x in front_slice if x > 0]
     right_slice = [x for x in right_slice if x > 0]
     left_slice = [x for x in left_slice if x > 0]
+    back_slice = [x for x in back_slice if x > 0]
     front = 2
     right = 0
     left = 0
+    back = 0
     if(len(front_slice) != 0):
         front = sum(front_slice)/len(front_slice)
     if(len(right_slice) != 0):
         right = sum(right_slice)/len(right_slice)
     if(len(left_slice) != 0):
         left = sum(left_slice)/len(left_slice)
-    print(left, ", ",front,", ", right)
+    if(len(back_slice) != 0):
+        back = sum(back_slice)/len(back_slice)
+    print(left, ", ",front,", ", right, ", ", back)
     return left,front,right
