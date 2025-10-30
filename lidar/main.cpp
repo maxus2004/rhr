@@ -171,6 +171,10 @@ int main(int argc, char** argv) {
         });
     }
 
+    while(true){
+        std::this_thread::yield();
+    }
+
     // // Renderer (main thread): init window and run Raylib loop
     // InitWindow(winw, winh, "LD19 Visualizer");
     // SetTargetFPS(60);
