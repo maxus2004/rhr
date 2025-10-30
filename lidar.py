@@ -3,7 +3,7 @@ import threading
 import re
 
 imu_process = subprocess.Popen(
-    ["lidar/build/lidar", "--port", "/dev/ttyUSB0", "--baud", "230400", "--print", "--window", "200x200", "--min-distance", "0", "--max-distance", "10", "--update-delay", "0.2", "--dots", "360"],
+    ["lidar/build/lidar", "--port", "/dev/ttyUSB0", "--baud", "230400", "--print", "--window", "200x200", "--min-distance", "0", "--max-distance", "2", "--update-delay", "0.2", "--dots", "360"],
     stdout=subprocess.PIPE,
     stderr=subprocess.STDOUT,
     text=True
@@ -53,4 +53,4 @@ def getDistances():
     if(len(back_slice) != 0):
         back = sum(back_slice)/len(back_slice)
     print(left, ", ",front,", ", right, ", ", back)
-    return left,back,right
+    return left,front,right

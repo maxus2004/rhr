@@ -61,7 +61,7 @@ def turnLeft():
     turnTo(targetYaw)
 
 
-time.sleep(20)
+time.sleep(10)
 
 while True:
     leftDistance, frontDistance, rightDistance = lidar.getDistances()
