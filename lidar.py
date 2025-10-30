@@ -13,7 +13,7 @@ lidar_distances_tmp = [0.0]*360
 
 lidar_distances = [0.0]*360
 
-def imu_thread():
+def lidar_thread():
     global lidar_distances_tmp, lidar_distances
     for line in imu_process.stdout:
         # print("LIDAR > ", line.strip())
@@ -27,10 +27,10 @@ def imu_thread():
             # print(lidar_distances)
        
 
-threading.Thread(target=imu_thread).start()
+threading.Thread(target=lidar_thread).start()
 
 def getDistances():
-    print(lidar_distances)
+    # print(lidar_distances)
     slice_size = 20
     front_slice = lidar_distances[0:slice_size] + lidar_distances[359-slice_size:359]
     right_slice = lidar_distances[90-slice_size:90+slice_size]
