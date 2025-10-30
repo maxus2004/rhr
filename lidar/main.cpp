@@ -10,7 +10,7 @@
 // - --min-distance M (meters; ignores points closer than this threshold)
 
 #include "ld19_gatherer.hpp"
-#include "raylib.h"
+// #include "raylib.h"
 
 #include <cmath>
 #include <iostream>
@@ -171,65 +171,65 @@ int main(int argc, char** argv) {
         });
     }
 
-    // Renderer (main thread): init window and run Raylib loop
-    InitWindow(winw, winh, "LD19 Visualizer");
-    SetTargetFPS(60);
+    // // Renderer (main thread): init window and run Raylib loop
+    // InitWindow(winw, winh, "LD19 Visualizer");
+    // SetTargetFPS(60);
 
-    // Main render loop: draws either display_points (if printing enabled) or live recent updates
-    while (!WindowShouldClose()) {
-        BeginDrawing();
-        ClearBackground(BLACK);
+    // // Main render loop: draws either display_points (if printing enabled) or live recent updates
+    // while (!WindowShouldClose()) {
+    //     BeginDrawing();
+    //     ClearBackground(BLACK);
 
-        Vector2 center = { winw / 2.0f, winh / 2.0f };
+    //     Vector2 center = { winw / 2.0f, winh / 2.0f };
 
-        if (print_points) {
-            std::vector<ld19::LD19Gatherer::RecentPoint> pts_copy;
-            {
-                std::lock_guard<std::mutex> lk(display_mtx);
-                pts_copy = display_points; // small copy
-            }
-            for (const auto &p : pts_copy) {
-                if (p.range_m <= 0.0f) continue;
-                if (p.range_m < static_cast<float>(min_distance_m) || p.range_m > static_cast<float>(max_distance_m)) continue;
-                float angle_rad = p.angle_deg * (float)(M_PI / 180.0);
-                float x = center.x + sinf(angle_rad) * p.range_m * pixels_per_meter;
-                float y = center.y - cosf(angle_rad) * p.range_m * pixels_per_meter;
-                Color c = {
-                    static_cast<unsigned char>(255),
-                    static_cast<unsigned char>(std::max(0, 255 - int(p.intensity))),
-                    static_cast<unsigned char>(0),
-                    static_cast<unsigned char>(255)
-                };
-                DrawPixelV({ x, y }, c);
-            }
-        } else {
-            std::vector<ld19::LD19Gatherer::RecentPoint> live_pts;
-            g.getRecentUpdates(live_pts);
-            for (const auto &p : live_pts) {
-                if (p.range_m <= 0.0f) continue;
-                if (p.range_m < static_cast<float>(min_distance_m) || p.range_m > static_cast<float>(max_distance_m)) continue;
-                float angle_rad = p.angle_deg * (float)(M_PI / 180.0);
-                float x = center.x + sinf(angle_rad) * p.range_m * pixels_per_meter;
-                float y = center.y - cosf(angle_rad) * p.range_m * pixels_per_meter;
-                Color c = {
-                    static_cast<unsigned char>(255),
-                    static_cast<unsigned char>(std::max(0, 255 - int(p.intensity))),
-                    static_cast<unsigned char>(0),
-                    static_cast<unsigned char>(255)
-                };
-                DrawPixelV({ x, y }, c);
-            }
-        }
+    //     if (print_points) {
+    //         std::vector<ld19::LD19Gatherer::RecentPoint> pts_copy;
+    //         {
+    //             std::lock_guard<std::mutex> lk(display_mtx);
+    //             pts_copy = display_points; // small copy
+    //         }
+    //         for (const auto &p : pts_copy) {
+    //             if (p.range_m <= 0.0f) continue;
+    //             if (p.range_m < static_cast<float>(min_distance_m) || p.range_m > static_cast<float>(max_distance_m)) continue;
+    //             float angle_rad = p.angle_deg * (float)(M_PI / 180.0);
+    //             float x = center.x + sinf(angle_rad) * p.range_m * pixels_per_meter;
+    //             float y = center.y - cosf(angle_rad) * p.range_m * pixels_per_meter;
+    //             Color c = {
+    //                 static_cast<unsigned char>(255),
+    //                 static_cast<unsigned char>(std::max(0, 255 - int(p.intensity))),
+    //                 static_cast<unsigned char>(0),
+    //                 static_cast<unsigned char>(255)
+    //             };
+    //             DrawPixelV({ x, y }, c);
+    //         }
+    //     } else {
+    //         std::vector<ld19::LD19Gatherer::RecentPoint> live_pts;
+    //         g.getRecentUpdates(live_pts);
+    //         for (const auto &p : live_pts) {
+    //             if (p.range_m <= 0.0f) continue;
+    //             if (p.range_m < static_cast<float>(min_distance_m) || p.range_m > static_cast<float>(max_distance_m)) continue;
+    //             float angle_rad = p.angle_deg * (float)(M_PI / 180.0);
+    //             float x = center.x + sinf(angle_rad) * p.range_m * pixels_per_meter;
+    //             float y = center.y - cosf(angle_rad) * p.range_m * pixels_per_meter;
+    //             Color c = {
+    //                 static_cast<unsigned char>(255),
+    //                 static_cast<unsigned char>(std::max(0, 255 - int(p.intensity))),
+    //                 static_cast<unsigned char>(0),
+    //                 static_cast<unsigned char>(255)
+    //             };
+    //             DrawPixelV({ x, y }, c);
+    //         }
+    //     }
 
-        EndDrawing();
-    }
+    //     EndDrawing();
+    // }
 
     // Shutdown
     running.store(false);
     if (printer_thread.joinable()) printer_thread.join();
 
     g.stop();
-    CloseWindow();
+    // CloseWindow();
 
     std::cerr << "Visualizer closed. Lidar stopped.\n";
     return 0;
