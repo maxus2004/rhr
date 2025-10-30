@@ -74,8 +74,12 @@ while True:
         # if still can turn right, turn right
         leftDistance, frontDistance, rightDistance = lidar.getDistances()
         if rightDistance > 0.4: turnRight()
-    elif frontDistance < 0.15:
+        stop()
+        time.sleep(1)
+    elif frontDistance < 0.2:
         turnLeft()
+        stop()
+        time.sleep(1)
 
     continueDriving()
     time.sleep(0.02)
