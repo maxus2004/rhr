@@ -10,7 +10,7 @@
 #include <chrono>
 #include "madgwick_filter.h"
 
-#define SPI_SPEED 10000000
+#define SPI_SPEED 1000000
 
 // LSM6DSO registerss
 #define WHO_AM_I        0x0F
