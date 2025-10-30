@@ -53,4 +53,4 @@ def getDistances():
     if(len(back_slice) != 0):
         back = sum(back_slice)/len(back_slice)
     print(left, ", ",front,", ", right, ", ", back)
-    return left,front,right
+    return left,back,right
