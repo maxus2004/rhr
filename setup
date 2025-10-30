@@ -1,4 +1,4 @@
-sudo apt install cmake libx11-dev libgl-dev 
+sudo apt install cmake make g++ libx11-dev libgl-dev 
 cd imu
 cmake -B build
 cd build
