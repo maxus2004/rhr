@@ -72,7 +72,7 @@ while True:
         startTime = time.time()
         while(time.time()-startTime < 2):
             continueDriving()
-            time.sleep(0.02)
+            time.sleep(0.1)
         # if still can turn right, turn right
         print("TURNING RIGHT")
         leftDistance, frontDistance, rightDistance = lidar.getDistances()
@@ -86,4 +86,4 @@ while True:
         time.sleep(1)
 
     continueDriving()
-    time.sleep(0.02)
+    time.sleep(0.1)
