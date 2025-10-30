@@ -15,7 +15,7 @@ imu_yaw = 0
 def imu_thread():
     global imu_yaw
     for line in imu_process.stdout:
-        # print("IMU > ", line.strip())
+        print("IMU > ", line.strip())
         if line.startswith("yaw:"):
             imu_yaw = float(line.strip().split()[1])
 
