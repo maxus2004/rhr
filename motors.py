@@ -19,7 +19,7 @@ def read_loop():
         try:
             line = ser.readline().decode(errors='ignore').strip()
             if line:
-                print(f"ESP32 > {line}")
+                # print(f"ESP32 > {line}")
                 log_line("IN", line)
         except Exception as e:
             print(f"Read error: {e}")
@@ -30,7 +30,7 @@ threading.Thread(target=read_loop, daemon=True).start()
 
 def command(msg):
     ser.write((msg + "\r\n").encode())
-    print(f"ESP32 < {msg}")
+    # print(f"ESP32 < {msg}")
     log_line("OUT", msg)
 
 command('{"T":131,"cmd":1}')
