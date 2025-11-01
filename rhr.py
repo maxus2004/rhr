@@ -7,12 +7,11 @@ import motors
 import imu
 import lidar
 import threading
-from params import *
 
 targetYaw = 0
 
 def continueDriving():
-    motors.motorCommand(LINEAR_SPEED,LINEAR_SPEED)
+    motors.motorCommand(300,300)
 
 def stop():
     motors.motorCommand(0,0)
@@ -32,24 +31,24 @@ def turnTo(targetYaw):
         error = fixAngleOverflow(targetYaw-yaw)
 
         # move forward/backward a bit if stuck
-        if(time.time()-prevMoveTime > UNSTUCK_INTERVAL):
+        if(time.time()-prevMoveTime > 2):
             prevMoveTime = time.time()
             if prevMoveDirection == "forwards":
-                motors.motorCommand(-UNSTUCK_SPEED, -UNSTUCK_SPEED)
+                motors.motorCommand(-300, -300)
                 prevMoveDirection = "backwards"
             else:
-                motors.motorCommand(UNSTUCK_SPEED, UNSTUCK_SPEED)
+                motors.motorCommand(300, 300)
                 prevMoveDirection = "forwards"
             time.sleep(0.1)
 
         # turn
         if(error > 1):
-            motors.motorCommand(TURN_SPEED, -TURN_SPEED)
+            motors.motorCommand(500, -500)
         elif(error < -1):
-            motors.motorCommand(-TURN_SPEED, TURN_SPEED)
+            motors.motorCommand(-500, 500)
         else:
             break
-        time.sleep(TURN_INTERVAL)
+        time.sleep(0.02)
 
 def turnRight():
     global targetYaw
@@ -61,31 +60,30 @@ def turnLeft():
     targetYaw = fixAngleOverflow(targetYaw-90)
     turnTo(targetYaw)
 
-print("calibrationg IMU...")
+
 time.sleep(10)
-print("done calibrating")
 
 while True:
     leftDistance, frontDistance, rightDistance = lidar.getDistances()
 
     # duh
-    if rightDistance > RIGHT_DISTANCE:
+    if rightDistance > 0.3:
         # drive forward a bit
         startTime = time.time()
-        while(time.time()-startTime < RIGHT_TURN_DELAY):
+        while(time.time()-startTime < 2.5):
             continueDriving()
-            time.sleep(DRIVE_INTERVAL)
+            time.sleep(0.1)
         # if still can turn right, turn right
         print("TURNING RIGHT")
         leftDistance, frontDistance, rightDistance = lidar.getDistances()
-        if rightDistance > RIGHT_DISTANCE: turnRight()
+        if rightDistance > 0.3: turnRight()
         stop()
-        time.sleep(TURN_DELAY)
-    elif frontDistance < FRONT_DISTANCE:
+        time.sleep(1)
+    elif frontDistance < 0.2:
         print("TURNING LEFT")
         turnLeft()
         stop()
-        time.sleep(TURN_DELAY)
+        time.sleep(1)
 
     continueDriving()
-    time.sleep(DRIVE_INTERVAL)
+    time.sleep(0.1)
