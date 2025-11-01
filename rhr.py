@@ -69,16 +69,16 @@ while True:
     leftDistance, frontDistance, rightDistance = lidar.getDistances()
 
     # duh
-    if leftDistance < RIGHT_DISTANCE:
+    if leftDistance < LEFT_DISTANCE:
         # drive forward a bit
         startTime = time.time()
-        while(time.time()-startTime < RIGHT_TURN_DELAY):
+        while(time.time()-startTime < LEFT_TURN_DELAY):
             continueDriving()
             time.sleep(DRIVE_INTERVAL)
         # if still can turn left, turn left
         print("TURNING LEFT")
         leftDistance, frontDistance, rightDistance = lidar.getDistances()
-        if leftDistance > RIGHT_DISTANCE: turnLeft()
+        if leftDistance > LEFT_DISTANCE: turnLeft()
         stop()
         time.sleep(TURN_DELAY)
     elif frontDistance < FRONT_DISTANCE:
