@@ -71,12 +71,12 @@ while True:
     if frontDistance < FRONT_DISTANCE:
         if(rightDistance > RIGHT_DISTANCE):
             print("TURNING LEFT")
-            turnLeft()
+            turnRight()
             stop()
             time.sleep(TURN_DELAY)
         else:
             print("TURNING RIGHT")
-            turnRight()
+            turnLeft()
             stop()
             time.sleep(TURN_DELAY)
 
