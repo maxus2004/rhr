@@ -31,7 +31,7 @@ threading.Thread(target=lidar_thread).start()
 
 def getDistances():
     # print(lidar_distances)
-    slice_size = 20
+    slice_size = 10
     front_slice = lidar_distances[0:slice_size] + lidar_distances[359-slice_size:359]
     right_slice = lidar_distances[90-slice_size:90+slice_size]
     left_slice = lidar_distances[270-slice_size:270+slice_size]
