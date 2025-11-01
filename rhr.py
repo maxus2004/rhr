@@ -68,17 +68,24 @@ print("done calibrating")
 while True:
     leftDistance, frontDistance, rightDistance = lidar.getDistances()
 
-    if frontDistance < FRONT_DISTANCE:
-        if(rightDistance > RIGHT_DISTANCE):
-            print("TURNING RIGHT")
-            turnRight()
-            stop()
-            time.sleep(TURN_DELAY)
-        else:
-            print("TURNING LEFT")
-            turnLeft()
-            stop()
-            time.sleep(TURN_DELAY)
+    # duh
+    if rightDistance > RIGHT_DISTANCE:
+        # drive forward a bit
+        startTime = time.time()
+        while(time.time()-startTime < RIGHT_TURN_DELAY):
+            continueDriving()
+            time.sleep(DRIVE_INTERVAL)
+        # if still can turn right, turn right
+        print("TURNING RIGHT")
+        leftDistance, frontDistance, rightDistance = lidar.getDistances()
+        if rightDistance > RIGHT_DISTANCE: turnRight()
+        stop()
+        time.sleep(TURN_DELAY)
+    elif frontDistance < FRONT_DISTANCE:
+        print("TURNING LEFT")
+        turnLeft()
+        stop()
+        time.sleep(TURN_DELAY)
 
     continueDriving()
     time.sleep(DRIVE_INTERVAL)
