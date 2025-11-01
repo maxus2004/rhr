@@ -69,7 +69,7 @@ while True:
     leftDistance, frontDistance, rightDistance = lidar.getDistances()
 
     if frontDistance < FRONT_DISTANCE:
-        if(leftDistance > rightDistance):
+        if(rightDistance > RIGHT_DISTANCE):
             print("TURNING LEFT")
             turnLeft()
             stop()
