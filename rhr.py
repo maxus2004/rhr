@@ -69,7 +69,7 @@ while True:
     leftDistance, frontDistance, rightDistance = lidar.getDistances()
 
     # duh
-    if leftDistance < LEFT_DISTANCE:
+    if leftDistance > LEFT_DISTANCE:
         # drive forward a bit
         startTime = time.time()
         while(time.time()-startTime < LEFT_TURN_DELAY):
