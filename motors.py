@@ -40,4 +40,4 @@ command('{"T":3,"lineNum":2,"Text":"### #   #   # #"}')
 command('{"T":3,"lineNum":3,"Text":"# # #    ## # #"}')
 
 def motorCommand(left, right):
-    command('{"T":1,"L":'+str(left)+',"R":'+str(right)+'}')
+    command('{"T":1,"L":'+str(int(left))+',"R":'+str(int(right))+'}')
